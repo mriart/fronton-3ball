@@ -5,6 +5,7 @@
 package main
 
 import (
+	"embed"
 	"fmt"
 	"image/color"
 	"math/rand/v2"
@@ -33,6 +34,9 @@ const (
 	audioMiss
 	audioOver
 )
+
+//go:embed res/*.mp3
+var embeddedFS embed.FS
 
 type Game struct {
 	State int // Defines the game state: 0 not initiated, 1 started, 2 over
@@ -73,11 +77,12 @@ func (g *Game) Initialize() {
 	g.Racket.Y = screenHeight - 1 - 5 - racketHeight
 	g.Racket.Speed = racketSpeed
 
+	// Initalize audio (only if it starts, not when re-starting)
 	if g.audioContext == nil {
 		g.audioContext = audio.NewContext(48000)
 
 		// Audio start
-		fStart, err := os.Open("res/game-start-6104.mp3")
+		fStart, err := embeddedFS.Open("res/game-start-6104.mp3")
 		if err != nil {
 			panic(err)
 		}
@@ -85,7 +90,7 @@ func (g *Game) Initialize() {
 		g.audioPlayerStart, _ = g.audioContext.NewPlayer(dStart)
 
 		// Audio hit the ball
-		fHit, err := os.Open("res/one_beep-99630.mp3")
+		fHit, err := embeddedFS.Open("res/one_beep-99630.mp3")
 		if err != nil {
 			panic(err)
 		}
@@ -93,7 +98,7 @@ func (g *Game) Initialize() {
 		g.audioPlayerHit, _ = g.audioContext.NewPlayer(dHit)
 
 		// Audio misses the ball
-		fMiss, err := os.Open("res/coin-collect-retro-8-bit-sound-effect-145251.mp3")
+		fMiss, err := embeddedFS.Open("res/coin-collect-retro-8-bit-sound-effect-145251.mp3")
 		if err != nil {
 			panic(err)
 		}
@@ -101,7 +106,7 @@ func (g *Game) Initialize() {
 		g.audioPlayerMiss, _ = g.audioContext.NewPlayer(dMiss)
 
 		// Audio game over
-		fOver, err := os.Open("res/cute-level-up-3-189853.mp3")
+		fOver, err := embeddedFS.Open("res/cute-level-up-3-189853.mp3")
 		if err != nil {
 			panic(err)
 		}
