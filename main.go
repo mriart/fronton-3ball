@@ -11,6 +11,8 @@ import (
 	"os"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 )
@@ -22,7 +24,14 @@ const (
 	racketWidth  = screenWidth / 4
 	racketHeight = 5 // +5 pixels of distance between racket and floor, fixed
 	racketSpeed  = 8
-	winnerScore  = 15
+	winnerScore  = 21
+)
+
+const (
+	audioStart = iota
+	audioHit
+	audioMiss
+	audioOver
 )
 
 type Game struct {
@@ -37,6 +46,11 @@ type Game struct {
 		Y     int // The y point of the vertex. It is a fixed value, but useful for geometry
 		Speed int
 	}
+	audioContext     *audio.Context
+	audioPlayerStart *audio.Player
+	audioPlayerHit   *audio.Player
+	audioPlayerMiss  *audio.Player
+	audioPlayerOver  *audio.Player
 }
 
 type Ball struct {
@@ -52,10 +66,48 @@ func (g *Game) Initialize() {
 	g.State = 0
 	g.Score.Player = 0
 	g.Score.CPU = 0
+
 	g.Balls = []Ball{}
+
 	g.Racket.X = screenWidth/2 - racketWidth/2
 	g.Racket.Y = screenHeight - 1 - 5 - racketHeight
 	g.Racket.Speed = racketSpeed
+
+	if g.audioContext == nil {
+		g.audioContext = audio.NewContext(48000)
+
+		// Audio start
+		fStart, err := os.Open("res/game-start-6104.mp3")
+		if err != nil {
+			panic(err)
+		}
+		dStart, _ := mp3.DecodeWithoutResampling(fStart)
+		g.audioPlayerStart, _ = g.audioContext.NewPlayer(dStart)
+
+		// Audio hit the ball
+		fHit, err := os.Open("res/one_beep-99630.mp3")
+		if err != nil {
+			panic(err)
+		}
+		dHit, _ := mp3.DecodeWithoutResampling(fHit)
+		g.audioPlayerHit, _ = g.audioContext.NewPlayer(dHit)
+
+		// Audio misses the ball
+		fMiss, err := os.Open("res/coin-collect-retro-8-bit-sound-effect-145251.mp3")
+		if err != nil {
+			panic(err)
+		}
+		dMiss, _ := mp3.DecodeWithoutResampling(fMiss)
+		g.audioPlayerMiss, _ = g.audioContext.NewPlayer(dMiss)
+
+		// Audio game over
+		fOver, err := os.Open("res/cute-level-up-3-189853.mp3")
+		if err != nil {
+			panic(err)
+		}
+		dOver, _ := mp3.DecodeWithoutResampling(fOver)
+		g.audioPlayerOver, _ = g.audioContext.NewPlayer(dOver)
+	}
 }
 
 func (g *Game) AddBall(rad int, R, G, B, A uint8, speedx, speedy int) {
@@ -86,6 +138,7 @@ func (g *Game) Update() error {
 
 		if ebiten.IsKeyPressed(ebiten.KeySpace) {
 			g.State = 1
+			go g.PlaySound(audioStart)
 		}
 
 		return nil
@@ -148,9 +201,11 @@ func (g *Game) Update() error {
 			//g.Balls[i].SpeedY = accelerateNRevers(g.Balls[i].SpeedY)
 			g.Balls[i].SpeedY = -g.Balls[i].SpeedY
 			g.Score.Player++
+			go g.PlaySound(audioHit)
 		} else {
 			g.Balls[i].ResetBall()
 			g.Score.CPU++
+			go g.PlaySound(audioMiss)
 		}
 	}
 
@@ -158,6 +213,7 @@ func (g *Game) Update() error {
 	// -If reached winnerScore, game is over
 	// -Add a new ball every 3 player points
 	if g.Score.Player == winnerScore || g.Score.CPU == winnerScore {
+		go g.PlaySound(audioOver)
 		g.State = 2
 	} else if g.Score.Player == len(g.Balls)*3 {
 		// Add a total random ball
@@ -207,6 +263,24 @@ func randBetween(n, m int) int {
 		return 0
 	}
 	return rand.IntN(m+1-n) + n
+}
+
+// Play a sound for each situation (sit)
+func (g *Game) PlaySound(sit int) {
+	switch sit {
+	case audioStart:
+		g.audioPlayerStart.Rewind()
+		g.audioPlayerStart.Play()
+	case audioHit:
+		g.audioPlayerHit.Rewind()
+		g.audioPlayerHit.Play()
+	case audioMiss:
+		g.audioPlayerMiss.Rewind()
+		g.audioPlayerMiss.Play()
+	case audioOver:
+		g.audioPlayerOver.Rewind()
+		g.audioPlayerOver.Play()
+	}
 }
 
 func main() {
